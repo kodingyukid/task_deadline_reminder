@@ -1,0 +1,42 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <record id="res_config_settings_view_form_inherit_task_deadline"
+            model="ir.ui.view">
+        <field name="name">res.config.settings.view.form.inherit.task.deadline</field>
+        <field name="model">res.config.settings</field>
+        <field name="inherit_id" ref="base.res_config_settings_view_form"/>
+        <field name="arch" type="xml">
+
+            <!-- Masukkan ke dalam Settings -->
+            <xpath expr="//form" position="inside">
+
+                <app name="task_deadline_reminder" string="Task Deadline Reminder">
+
+                    <block title="Task Deadline Reminder">
+                        <setting string="Sender Email">
+                            <div class="text-muted">
+                                Configure the sender email for task deadline reminders.
+                            </div>
+                            <field name="task_reminder_email_from"/>
+                        </setting>
+                    </block>
+
+                    <block title="Test Deadline Reminder">
+                        <setting>
+                            <div class="text-muted">
+                                Open a wizard to send a test reminder email to a selected employee.
+                            </div>
+                            <button name="%(task_deadline_reminder.action_launch_task_reminder_tester)d"
+                                    string="Launch Test"
+                                    type="action"
+                                    class="btn-primary"/>
+                        </setting>
+                    </block>
+
+                </app>
+
+            </xpath>
+
+        </field>
+    </record>
+</odoo>

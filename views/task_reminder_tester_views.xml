@@ -1,0 +1,31 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <data>
+
+        <!-- Form View for the Wizard -->
+        <record id="view_task_reminder_tester_form" model="ir.ui.view">
+            <field name="name">task.reminder.tester.form</field>
+            <field name="model">task.reminder.tester</field>
+            <field name="arch" type="xml">
+                <form string="Test Deadline Reminder">
+                    <group>
+                        <field name="employee_id"/>
+                    </group>
+                    <footer>
+                        <button name="action_send_test_email" string="Send Test Email" type="object" class="btn-primary"/>
+                        <button string="Cancel" class="btn-secondary" special="cancel"/>
+                    </footer>
+                </form>
+            </field>
+        </record>
+
+        <!-- Window Action to Open the Wizard -->
+        <record id="action_launch_task_reminder_tester" model="ir.actions.act_window">
+            <field name="name">Test Task Deadline Reminder</field>
+            <field name="res_model">task.reminder.tester</field>
+            <field name="view_mode">form</field>
+            <field name="target">new</field>
+        </record>
+
+    </data>
+</odoo>

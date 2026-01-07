@@ -74,6 +74,13 @@ class ProjectTask(models.Model):
             ('user_ids', '!=', False),
             ('stage_id.fold', '=', False)
         ])
+        
+        mail_server_id = self.env['ir.config_parameter'].sudo().get_param('task_deadline_reminder.email_from')
+        email_from = False
+        if mail_server_id:
+            mail_server = self.env['ir.mail_server'].browse(int(mail_server_id))
+            if mail_server.smtp_user:
+                email_from = mail_server.smtp_user
 
         for task in tasks:
             template = self.env.ref('task_deadline_reminder.email_template_task_deadline_reminder', raise_if_not_found=False)

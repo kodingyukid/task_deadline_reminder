@@ -1,9 +1,9 @@
 {
     'name': 'Task Deadline Reminder',
-    'version': '17.0.1.0.0',
+    'version': '17.0.3.0.0',
     'summary': 'Send email notifications for tasks with upcoming deadlines.',
-    'author': 'Gemini',
-    'website': 'https://www.gemini.com',
+    'author': 'KodingYuk',
+    'website': 'https://kodingyuk.id',
     'category': 'Project',
     'depends': ['project', 'mail', 'hr'],
     'data': [

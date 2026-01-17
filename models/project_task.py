@@ -90,6 +90,7 @@ class ProjectTask(models.Model):
 
     def _send_whatsapp_message(self, task_name, deadline, task_link, phone_number):
         waha_url = self.env['ir.config_parameter'].sudo().get_param('task_deadline_reminder.waha_api_url')
+        waha_key = self.env['ir.config_parameter'].sudo().get_param('task_deadline_reminder.waha_api_key')
         template = self.env['ir.config_parameter'].sudo().get_param('task_deadline_reminder.whatsapp_message_template')
         
         if not waha_url:
@@ -105,6 +106,9 @@ class ProjectTask(models.Model):
                           .replace('{{ task_link }}', task_link)
 
         headers = {'Content-Type': 'application/json'}
+        if waha_key:
+            headers['X-Api-Key'] = waha_key
+
         payload = {
             'chatId': f"{phone_number}@c.us",
             'text': message,

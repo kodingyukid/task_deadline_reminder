@@ -16,6 +16,12 @@ class ResConfigSettings(models.TransientModel):
         help="The URL of the WAHA API endpoint (e.g., http://localhost:3000)."
     )
     
+    waha_api_key = fields.Char(
+        string='WAHA API Key',
+        config_parameter='task_deadline_reminder.waha_api_key',
+        help="Optional API Key if your WAHA instance is secured."
+    )
+
     whatsapp_message_template = fields.Char(
         string='WhatsApp Message Template',
         config_parameter='task_deadline_reminder.whatsapp_message_template',

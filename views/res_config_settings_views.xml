@@ -28,6 +28,12 @@
                             </div>
                             <field name="waha_api_url"/>
                         </setting>
+                        <setting string="WAHA API Key">
+                            <div class="text-muted">
+                                Optional API Key for secured WAHA.
+                            </div>
+                            <field name="waha_api_key"/>
+                        </setting>
                         <setting string="Message Template">
                             <div class="text-muted">
                                 Template for the WhatsApp message.

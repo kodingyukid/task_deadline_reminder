@@ -10,6 +10,7 @@
         'security/ir.model.access.csv',
         'data/cron.xml',
         'data/mail_template.xml',
+        'views/project_task_views.xml',
         'views/task_reminder_tester_views.xml',
         'views/res_config_settings_views.xml',
     ],

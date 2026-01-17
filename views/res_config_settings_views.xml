@@ -21,6 +21,21 @@
                         </setting>
                     </block>
 
+                    <block title="WhatsApp Configuration">
+                        <setting string="WAHA API URL">
+                            <div class="text-muted">
+                                The URL of the WAHA API endpoint.
+                            </div>
+                            <field name="waha_api_url"/>
+                        </setting>
+                        <setting string="Message Template">
+                            <div class="text-muted">
+                                Template for the WhatsApp message.
+                            </div>
+                            <field name="whatsapp_message_template"/>
+                        </setting>
+                    </block>
+
                     <block title="Test Deadline Reminder">
                         <setting>
                             <div class="text-muted">

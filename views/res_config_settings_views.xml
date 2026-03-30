@@ -22,21 +22,27 @@
                     </block>
 
                     <block title="WhatsApp Configuration">
-                        <setting string="WAHA API URL">
+                        <setting string="Evolution API URL">
                             <div class="text-muted">
-                                The URL of the WAHA API endpoint.
+                                The URL of the Evolution API endpoint (e.g., https://sub.domain.com).
                             </div>
-                            <field name="waha_api_url"/>
+                            <field name="evolution_api_url"/>
                         </setting>
-                        <setting string="WAHA API Key">
+                        <setting string="Evolution API Key">
                             <div class="text-muted">
-                                Optional API Key for secured WAHA.
+                                API Key for Evolution API authentication.
                             </div>
-                            <field name="waha_api_key"/>
+                            <field name="evolution_api_key"/>
+                        </setting>
+                        <setting string="Evolution Instance Name">
+                            <div class="text-muted">
+                                The instance name for Evolution API.
+                            </div>
+                            <field name="evolution_instance_name"/>
                         </setting>
                         <setting string="Message Template">
                             <div class="text-muted">
-                                Template for the WhatsApp message.
+                                Template for the WhatsApp message. Available variables: {user_name}, {task_name}, {project_name}, {deadline}, {company_name}
                             </div>
                             <field name="whatsapp_message_template"/>
                         </setting>

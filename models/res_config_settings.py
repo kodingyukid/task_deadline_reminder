@@ -1,31 +1,60 @@
-from odoo import fields, models, api
+from odoo import fields, models
+
 
 class ResConfigSettings(models.TransientModel):
     _inherit = 'res.config.settings'
 
-    task_reminder_email_from = fields.Many2one(
-        'ir.mail_server',
-        string='Reminder Email From',
-        config_parameter='task_deadline_reminder.email_from',
-        help="The email address to be used as the 'from' address for task deadline reminders."
-    )
-
-    waha_api_url = fields.Char(
-        string='WAHA API URL',
-        config_parameter='task_deadline_reminder.waha_api_url',
-        help="The URL of the WAHA API endpoint (e.g., http://localhost:3000)."
+    task_reminder_email_from = fields.Char(
+        string='Sender Email',
+        help='Email address for sending task deadline reminders'
     )
     
-    waha_api_key = fields.Char(
-        string='WAHA API Key',
-        config_parameter='task_deadline_reminder.waha_api_key',
-        help="Optional API Key if your WAHA instance is secured."
+    evolution_api_url = fields.Char(
+        string='Evolution API URL',
+        help='The URL of the Evolution API endpoint (e.g., https://sub.domain.com)'
     )
-
-    whatsapp_message_template = fields.Char(
+    
+    evolution_api_key = fields.Char(
+        string='Evolution API Key',
+        help='API Key for Evolution API authentication'
+    )
+    
+    evolution_instance_name = fields.Char(
+        string='Evolution Instance Name',
+        help='The instance name for Evolution API'
+    )
+    
+    whatsapp_message_template = fields.Text(
         string='WhatsApp Message Template',
-        config_parameter='task_deadline_reminder.whatsapp_message_template',
-        default="Reminder: Task '{{ task_name }}' is due on {{ deadline }}. Link: {{ task_link }}. Do not reply.",
-        help="Template for the WhatsApp message. Variables: {{ task_name }}, {{ deadline }}, {{ task_link }}."
+        help='Template for the WhatsApp message',
+        default='Dear {user_name},\n\nThis is a reminder that the task "{task_name}" from project "{project_name}" is due on {deadline}.\n\nPlease ensure it is completed on time.\n\nThank you,\n{company_name}'
     )
 
+    def set_values(self):
+        super(ResConfigSettings, self).set_values()
+        self.env['ir.config_parameter'].sudo().set_param(
+            'task_deadline_reminder.task_reminder_email_from', self.task_reminder_email_from)
+        self.env['ir.config_parameter'].sudo().set_param(
+            'task_deadline_reminder.evolution_api_url', self.evolution_api_url)
+        self.env['ir.config_parameter'].sudo().set_param(
+            'task_deadline_reminder.evolution_api_key', self.evolution_api_key)
+        self.env['ir.config_parameter'].sudo().set_param(
+            'task_deadline_reminder.evolution_instance_name', self.evolution_instance_name)
+        self.env['ir.config_parameter'].sudo().set_param(
+            'task_deadline_reminder.whatsapp_message_template', self.whatsapp_message_template)
+
+    def get_values(self):
+        res = super(ResConfigSettings, self).get_values()
+        res.update(
+            task_reminder_email_from=self.env['ir.config_parameter'].sudo().get_param(
+                'task_deadline_reminder.task_reminder_email_from'),
+            evolution_api_url=self.env['ir.config_parameter'].sudo().get_param(
+                'task_deadline_reminder.evolution_api_url'),
+            evolution_api_key=self.env['ir.config_parameter'].sudo().get_param(
+                'task_deadline_reminder.evolution_api_key'),
+            evolution_instance_name=self.env['ir.config_parameter'].sudo().get_param(
+                'task_deadline_reminder.evolution_instance_name'),
+            whatsapp_message_template=self.env['ir.config_parameter'].sudo().get_param(
+                'task_deadline_reminder.whatsapp_message_template'),
+        )
+        return res

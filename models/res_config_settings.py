@@ -28,7 +28,7 @@ class ResConfigSettings(models.TransientModel):
         config_parameter='task_deadline_reminder.evolution_instance_name'
     )
     
-    whatsapp_message_template = fields.Text(
+    whatsapp_message_template = fields.Char(
         string='WhatsApp Message Template',
         help='Template for the WhatsApp message',
         default='Dear {user_name},\n\nThis is a reminder that the task "{task_name}" from project "{project_name}" is due on {deadline}.\n\nPlease ensure it is completed on time.\n\nThank you,\n{company_name}',

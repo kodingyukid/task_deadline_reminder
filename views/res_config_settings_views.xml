@@ -44,7 +44,7 @@
                             <div class="text-muted">
                                 Template for the WhatsApp message. Available variables: {user_name}, {task_name}, {project_name}, {deadline}, {company_name}
                             </div>
-                            <field name="whatsapp_message_template"/>
+                            <field name="whatsapp_message_template" widget="text"/>
                         </setting>
                     </block>
 

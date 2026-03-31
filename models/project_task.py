@@ -29,7 +29,7 @@ class ProjectTask(models.Model):
         tasks = self.search([
             ('date_deadline', '=', tomorrow_str),
             ('reminder_method', 'in', ['email', 'whatsapp', 'both']),
-            ('is_closed', '=', False) # Jangan kirim jika tugas sudah selesai
+            ('stage_id.fold', '=', False) # Jangan kirim jika tahapan/stagenya dilipat (folded)
         ])
         
         for task in tasks:

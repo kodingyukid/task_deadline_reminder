@@ -1,6 +1,9 @@
 import logging
 import requests
-from datetime import timedelta
+from datetime import datetime, time, timedelta
+
+import pytz
+
 from odoo import fields, models, api
 from odoo.exceptions import UserError
 
@@ -15,42 +18,75 @@ class ProjectTask(models.Model):
         ('both', 'Email & WhatsApp')
     ], string='Reminder Method', default='email', help='Metode pengiriman reminder')
 
+    def _cron_domain_deadline_tomorrow(self):
+        """
+        Odoo 17: project.task.date_deadline bertipe Datetime (bukan Date).
+        Domain ('date_deadline', '=', tanggal) hanya cocok nilai persis tengah malam,
+        sehingga deadline 02/04 10:00 tidak ketemu. Pakai rentang [start, end) hari
+        'besok' dalam timezone user cron, lalu konversi ke UTC (format DB Odoo).
+        """
+        tz_name = self.env.user.tz or 'UTC'
+        try:
+            tz = pytz.timezone(tz_name)
+        except Exception:
+            tz = pytz.UTC
+            tz_name = 'UTC'
+        today = fields.Date.context_today(self)
+        tomorrow = today + timedelta(days=1)
+        start_local = tz.localize(datetime.combine(tomorrow, time.min))
+        end_local = start_local + timedelta(days=1)
+        start_utc = start_local.astimezone(pytz.UTC).replace(tzinfo=None)
+        end_utc = end_local.astimezone(pytz.UTC).replace(tzinfo=None)
+        return [
+            ('date_deadline', '>=', start_utc),
+            ('date_deadline', '<', end_utc),
+        ], {
+            'tz': tz_name,
+            'today': today,
+            'tomorrow_cal': tomorrow,
+            'start_utc': start_utc,
+            'end_utc': end_utc,
+        }
+
     def _cron_send_deadline_reminder(self):
         """
         Logika: Mencari tugas yang deadline-nya BESOK.
         Misal: Sekarang tgl 22, deadline tgl 23 -> Kirim Reminder.
         """
-        # Pakai tanggal "hari ini" ala Odoo (timezone user cron / konteks), bukan datetime.now() mentah
-        today = fields.Date.context_today(self)
-        tomorrow = today + timedelta(days=1)
-        tz = self.env.user.tz or '(kosong: pakai default Odoo)'
+        deadline_dom, meta = self._cron_domain_deadline_tomorrow()
 
         _logger.info(
             "[task_deadline_reminder] === Cron: kirim reminder deadline ==="
         )
         _logger.info(
             "[task_deadline_reminder] Konteks: user_cron=%s (id=%s) | tz=%s | "
-            "hari_ini=%s | yang_dicari_deadline=%s (besok relatif ke hari_ini)",
+            "hari_ini=%s | besok(kalender)=%s",
             self.env.user.login,
             self.env.user.id,
-            tz,
-            today,
-            tomorrow,
+            meta['tz'],
+            meta['today'],
+            meta['tomorrow_cal'],
         )
         _logger.info(
-            "[task_deadline_reminder] Syarat task: date_deadline sama persis dengan %s; "
-            "reminder_method salah satu [email, whatsapp, both]; "
+            "[task_deadline_reminder] Pencarian date_deadline (Datetime): "
+            "UTC [%s .. %s) (semua jam di hari besok menurut tz di atas)",
+            meta['start_utc'],
+            meta['end_utc'],
+        )
+        _logger.info(
+            "[task_deadline_reminder] Syarat lain: reminder_method [email, whatsapp, both]; "
             "stage kosong ATAU stage.fold = False.",
-            tomorrow,
         )
 
-        tasks = self.search([
-            ('date_deadline', '=', tomorrow),
-            ('reminder_method', 'in', ['email', 'whatsapp', 'both']),
-            '|',
-            ('stage_id', '=', False),
-            ('stage_id.fold', '=', False),
-        ])
+        tasks = self.search(
+            deadline_dom
+            + [
+                ('reminder_method', 'in', ['email', 'whatsapp', 'both']),
+                '|',
+                ('stage_id', '=', False),
+                ('stage_id.fold', '=', False),
+            ]
+        )
 
         _logger.info(
             "[task_deadline_reminder] Hasil pencarian: %s task(s) cocok.",
@@ -58,9 +94,9 @@ class ProjectTask(models.Model):
         )
         if not tasks:
             _logger.info(
-                "[task_deadline_reminder] Tidak ada task. Periksa di UI: deadline task harus tepat %s; "
-                "metode reminder sudah dipilih; tahapan tidak folded (atau tanpa tahapan).",
-                tomorrow,
+                "[task_deadline_reminder] Tidak ada task. Periksa: deadline (tanggal+waktu) jatuh di hari %s "
+                "(lihat rentang UTC di atas); metode reminder; tahapan tidak folded.",
+                meta['tomorrow_cal'],
             )
             _logger.info("[task_deadline_reminder] === Cron selesai (tanpa pengiriman) ===")
             return

@@ -1,6 +1,6 @@
 import logging
 import requests
-from datetime import datetime, timedelta
+from datetime import timedelta
 from odoo import fields, models, api
 from odoo.exceptions import UserError
 
@@ -20,26 +20,84 @@ class ProjectTask(models.Model):
         Logika: Mencari tugas yang deadline-nya BESOK.
         Misal: Sekarang tgl 22, deadline tgl 23 -> Kirim Reminder.
         """
-        # Menghitung tanggal besok berdasarkan waktu server saat ini
-        tomorrow = datetime.now() + timedelta(days=1)
-        tomorrow_str = tomorrow.strftime('%Y-%m-%d')
-        
-        _logger.info(f"Checking reminders for deadline: {tomorrow_str}")
-        
+        # Pakai tanggal "hari ini" ala Odoo (timezone user cron / konteks), bukan datetime.now() mentah
+        today = fields.Date.context_today(self)
+        tomorrow = today + timedelta(days=1)
+        tz = self.env.user.tz or '(kosong: pakai default Odoo)'
+
+        _logger.info(
+            "[task_deadline_reminder] === Cron: kirim reminder deadline ==="
+        )
+        _logger.info(
+            "[task_deadline_reminder] Konteks: user_cron=%s (id=%s) | tz=%s | "
+            "hari_ini=%s | yang_dicari_deadline=%s (besok relatif ke hari_ini)",
+            self.env.user.login,
+            self.env.user.id,
+            tz,
+            today,
+            tomorrow,
+        )
+        _logger.info(
+            "[task_deadline_reminder] Syarat task: date_deadline sama persis dengan %s; "
+            "reminder_method salah satu [email, whatsapp, both]; "
+            "stage kosong ATAU stage.fold = False.",
+            tomorrow,
+        )
+
         tasks = self.search([
-            ('date_deadline', '=', tomorrow_str),
+            ('date_deadline', '=', tomorrow),
             ('reminder_method', 'in', ['email', 'whatsapp', 'both']),
-            ('stage_id.fold', '=', False) # Jangan kirim jika tahapan/stagenya dilipat (folded)
+            '|',
+            ('stage_id', '=', False),
+            ('stage_id.fold', '=', False),
         ])
-        
+
+        _logger.info(
+            "[task_deadline_reminder] Hasil pencarian: %s task(s) cocok.",
+            len(tasks),
+        )
+        if not tasks:
+            _logger.info(
+                "[task_deadline_reminder] Tidak ada task. Periksa di UI: deadline task harus tepat %s; "
+                "metode reminder sudah dipilih; tahapan tidak folded (atau tanpa tahapan).",
+                tomorrow,
+            )
+            _logger.info("[task_deadline_reminder] === Cron selesai (tanpa pengiriman) ===")
+            return
+
         for task in tasks:
+            _logger.info(
+                "[task_deadline_reminder] --- Task id=%s | nama=%r | metode=%s | stage=%s | fold=%s ---",
+                task.id,
+                task.name,
+                task.reminder_method,
+                task.stage_id.display_name if task.stage_id else '(tanpa stage)',
+                task.stage_id.fold if task.stage_id else False,
+            )
             try:
                 if task.reminder_method in ['email', 'both']:
+                    _logger.info(
+                        "[task_deadline_reminder] Task id=%s: jalankan pengiriman EMAIL",
+                        task.id,
+                    )
                     task._send_email_reminder()
                 if task.reminder_method in ['whatsapp', 'both']:
+                    _logger.info(
+                        "[task_deadline_reminder] Task id=%s: jalankan pengiriman WHATSAPP",
+                        task.id,
+                    )
                     task._send_whatsapp_reminder()
+                _logger.info(
+                    "[task_deadline_reminder] Task id=%s: selesai tanpa error",
+                    task.id,
+                )
             except Exception as e:
-                _logger.error(f"Gagal mengirim reminder untuk task ID {task.id}: {str(e)}")
+                _logger.exception(
+                    "[task_deadline_reminder] Gagal mengirim reminder untuk task id=%s: %s",
+                    task.id,
+                    str(e),
+                )
+        _logger.info("[task_deadline_reminder] === Cron selesai ===")
 
     def _format_whatsapp_number(self, number):
         """Logika mengubah 08xxx menjadi 628xxx dan hapus karakter non-digit"""
@@ -66,7 +124,11 @@ class ProjectTask(models.Model):
         message_template = param_obj.get_param('task_deadline_reminder.whatsapp_message_template')
 
         if not all([evolution_url, api_key, instance_name, message_template]):
-            _logger.warning("Konfigurasi WhatsApp Reminder belum lengkap di Settings.")
+            _logger.warning(
+                "[task_deadline_reminder] Task id=%s: konfigurasi WhatsApp belum lengkap "
+                "(Evolution URL / API Key / Instance / template). Cek Settings.",
+                self.id,
+            )
             return
 
         # 2. Buat Link Task (Dinamis sesuai domain ERP)
@@ -74,12 +136,24 @@ class ProjectTask(models.Model):
         task_link = f"{base_url}/web#id={self.id}&model=project.task&view_type=form"
 
         # 3. Kirim ke setiap User yang ditugaskan (Assignees)
+        if not self.user_ids:
+            _logger.warning(
+                "[task_deadline_reminder] Task id=%s: tidak ada assignee (user_ids kosong), WA tidak dikirim.",
+                self.id,
+            )
+            return
+
         for user in self.user_ids:
             # Format nomor WA
             wa_number = self._format_whatsapp_number(user.mobile_phone or user.phone)
             
             if not wa_number:
-                _logger.warning(f"User {user.name} tidak punya nomor HP yang valid.")
+                _logger.warning(
+                    "[task_deadline_reminder] Task id=%s: user %s (id=%s) tidak punya nomor HP yang valid.",
+                    self.id,
+                    user.name,
+                    user.id,
+                )
                 continue
                 
             try:
@@ -107,24 +181,102 @@ class ProjectTask(models.Model):
                 response = requests.post(endpoint, json=payload, headers=headers, timeout=25)
                 
                 if response.status_code in [200, 201]:
-                    _logger.info(f"WA Reminder terkirim ke {wa_number} untuk task: {self.name}")
+                    _logger.info(
+                        "[task_deadline_reminder] Task id=%s: WA terkirim ke %s (user=%s)",
+                        self.id,
+                        wa_number,
+                        user.name,
+                    )
                 else:
-                    _logger.error(f"Evolution API Error {response.status_code}: {response.text}")
+                    _logger.error(
+                        "[task_deadline_reminder] Task id=%s: Evolution API HTTP %s | %s",
+                        self.id,
+                        response.status_code,
+                        response.text,
+                    )
 
             except Exception as e:
-                _logger.error(f"Terjadi kesalahan saat kirim WA ke {user.name}: {str(e)}")
+                _logger.exception(
+                    "[task_deadline_reminder] Task id=%s: error kirim WA ke user %s: %s",
+                    self.id,
+                    user.name,
+                    str(e),
+                )
 
     def _send_email_reminder(self):
         """Kirim email menggunakan template XML"""
         template = self.env.ref('task_deadline_reminder.email_template_task_deadline_reminder', raise_if_not_found=False)
         if not template:
+            _logger.warning(
+                "[task_deadline_reminder] Task id=%s: template email tidak ditemukan, tidak mengirim.",
+                self.id,
+            )
             return
-            
+
+        if not self.user_ids:
+            _logger.warning(
+                "[task_deadline_reminder] Task id=%s: tidak ada assignee, email tidak dikirim.",
+                self.id,
+            )
+            return
+
         email_from = self.env['ir.config_parameter'].sudo().get_param('task_deadline_reminder.task_reminder_email_from')
-        
+        sent = 0
         for user in self.user_ids:
             if user.email:
                 template.send_mail(self.id, force_send=True, email_values={
                     'email_to': user.email,
                     'email_from': email_from
                 })
+                sent += 1
+                _logger.info(
+                    "[task_deadline_reminder] Task id=%s: email reminder dikirim ke %s (user=%s)",
+                    self.id,
+                    user.email,
+                    user.name,
+                )
+            else:
+                _logger.warning(
+                    "[task_deadline_reminder] Task id=%s: user %s (id=%s) tidak punya email, dilewati.",
+                    self.id,
+                    user.name,
+                    user.id,
+                )
+        _logger.info(
+            "[task_deadline_reminder] Task id=%s: ringkasan email — %s penerima terkirim.",
+            self.id,
+            sent,
+        )
+
+    @api.model
+    def _test_send_deadline_reminder(self, test_email):
+        """Kirim satu email uji ke alamat tertentu (wizard Settings)."""
+        if not test_email:
+            raise UserError('Alamat email uji kosong.')
+        template = self.env.ref(
+            'task_deadline_reminder.email_template_task_deadline_reminder',
+            raise_if_not_found=False,
+        )
+        if not template:
+            raise UserError('Template email Task Deadline Reminder tidak ditemukan.')
+        project = self.env['project.project'].search([], limit=1)
+        if not project:
+            raise UserError('Buat minimal satu project agar pengujian email bisa jalan.')
+        dummy = self.create({
+            'name': 'TEST: Deadline Reminder',
+            'project_id': project.id,
+            'date_deadline': fields.Date.today(),
+            'reminder_method': 'email',
+            'user_ids': [(4, self.env.user.id)],
+        })
+        try:
+            email_from = self.env['ir.config_parameter'].sudo().get_param(
+                'task_deadline_reminder.task_reminder_email_from'
+            )
+            template.send_mail(
+                dummy.id,
+                force_send=True,
+                email_values={'email_to': test_email, 'email_from': email_from},
+            )
+        finally:
+            dummy.unlink()
